@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"jarvis-agent/config"
 	"jarvis-agent/tools"
@@ -165,6 +166,77 @@ Gere o relatório completo em português brasileiro seguindo o formato definido 
 	}
 
 	log.Printf("Relatório salvo em: %s", j.writer.GetReportPath())
+
+	return report, nil
+}
+
+func (j *JarvisAgent) RunMonthly() (string, error) {
+	log.Println("Iniciando análise mensal...")
+
+	now := time.Now()
+	year := fmt.Sprintf("%d", now.Year())
+	month := fmt.Sprintf("%02d", now.Month())
+
+	notesPath := j.cfg.GetMonthlyNotesPath(year, month)
+	log.Printf("caminho das notas mensais: %s", notesPath)
+
+	notesContent, err := j.reader.ReadMonthlyNotes(notesPath)
+	if err != nil {
+		return "", fmt.Errorf("erro ao ler anotações mensais: %w", err)
+	}
+
+	log.Printf("Anotações mensais lidas: %d caracteres", len(notesContent))
+
+	prompt := fmt.Sprintf(`
+Analise as seguintes anotações do mês de %s/%s e gere um relatório de resumo do mês contendo:
+
+1. PRINCIPAIS CONQUISTAS do mês
+2. PONTOS DE ATENÇÃO e riscos que persistem
+3. LIÇÕES APRENDIDAS
+4. AÇÕES PENDENTES e próximos passos
+5. OBSERVAÇÕES FINAIS
+
+%s
+
+Gere o relatório completo em português brasileiro usando Markdown com emojis para melhorar a legibilidade.
+`, month, year, notesContent)
+
+	userMsg := genai.NewContentFromText(prompt, "user")
+
+	ctx := context.Background()
+	_, err = j.sessionService.Create(ctx, &session.CreateRequest{
+		AppName:   "jarvis-agent",
+		UserID:    "jarvis",
+		SessionID: "session-monthly-001",
+	})
+	if err != nil {
+		return "", fmt.Errorf("erro ao criar sessão: %w", err)
+	}
+
+	var report string
+	for event, err := range j.runnerx.Run(ctx, "jarvis", "session-monthly-001", userMsg, agent.RunConfig{}) {
+		if err != nil {
+			return "", fmt.Errorf("erro ao executar agente: %w", err)
+		}
+		if event.Content != nil && len(event.Content.Parts) > 0 {
+			if event.Content.Parts[0].Text != "" {
+				report = event.Content.Parts[0].Text
+			}
+		}
+	}
+
+	if report == "" {
+		return "", fmt.Errorf("nenhuma resposta do agente")
+	}
+
+	log.Printf("Relatório mensal gerado: %d caracteres", len(report))
+
+	monthlyReportPath := j.cfg.GetMonthlyReportPath(year, month)
+	if err := j.writer.WriteMonthlyReport(report, monthlyReportPath); err != nil {
+		return "", fmt.Errorf("erro ao salvar relatório mensal: %w", err)
+	}
+
+	log.Printf("Relatório mensal salvo em: %s", monthlyReportPath)
 
 	return report, nil
 }

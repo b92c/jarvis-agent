@@ -33,3 +33,17 @@ func (w *FileWriter) WriteReport(content string) error {
 func (w *FileWriter) GetReportPath() string {
 	return w.cfg.ReportOutputPath
 }
+
+func (w *FileWriter) WriteMonthlyReport(content string, path string) error {
+	dir := filepath.Dir(path)
+
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("erro ao criar diretório %s: %w", dir, err)
+	}
+
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		return fmt.Errorf("erro ao escrever relatório %s: %w", path, err)
+	}
+
+	return nil
+}

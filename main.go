@@ -63,7 +63,7 @@ func main() {
 	}
 
 	log.Println("✅ Jarvis Agent inicializado com sucesso!")
-	log.Println("⏰ Scheduler ativo: executará às 12:00 e 18:00")
+	log.Println("⏰ Scheduler ativo: executará às 12:00 e 18:00 (diário) e às 18:00 (mensal - último dia do mês)")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -80,6 +80,18 @@ func main() {
 	runScheduler(ctx, jarvisAgent, emailSvc)
 }
 
+type runType int
+
+const (
+	runDaily runType = iota
+	runMonthly
+)
+
+type scheduledRun struct {
+	time    time.Time
+	runType runType
+}
+
 func runScheduler(ctx context.Context, jarvisAgent *agent.JarvisAgent, emailSvc *services.EmailService) {
 	for {
 		select {
@@ -90,34 +102,48 @@ func runScheduler(ctx context.Context, jarvisAgent *agent.JarvisAgent, emailSvc 
 			now := time.Now()
 
 			nextRun := getNextRunTime(now)
-			waitDuration := nextRun.Sub(now)
+			waitDuration := nextRun.time.Sub(now)
 
-			log.Printf("⏳ Próxima execução: %s", nextRun.Format("02/01/2006 15:04:05"))
+			runTypeStr := "diário"
+			if nextRun.runType == runMonthly {
+				runTypeStr = "mensal"
+			}
+			log.Printf("⏳ Próxima execução: %s (%s)", nextRun.time.Format("02/01/2006 15:04:05"), runTypeStr)
 			log.Printf("⏳ Aguardando %v...", waitDuration)
 
 			select {
 			case <-ctx.Done():
 				return
 			case <-time.After(waitDuration):
-				executeReport(jarvisAgent, emailSvc)
+				if nextRun.runType == runMonthly {
+					executeMonthlyReport(jarvisAgent, emailSvc)
+				} else {
+					executeReport(jarvisAgent, emailSvc)
+				}
 			}
 		}
 	}
 }
 
-func getNextRunTime(now time.Time) time.Time {
+func getNextRunTime(now time.Time) scheduledRun {
 	hour12 := time.Date(now.Year(), now.Month(), now.Day(), 12, 0, 0, 0, saoPauloLocation)
 	hour18 := time.Date(now.Year(), now.Month(), now.Day(), 18, 0, 0, 0, saoPauloLocation)
 
+	lastDayOfMonth := time.Date(now.Year(), now.Month()+1, 0, 18, 0, 0, 0, saoPauloLocation)
+
+	if now.Day() == lastDayOfMonth.Day() && now.After(hour12) {
+		return scheduledRun{time: lastDayOfMonth, runType: runMonthly}
+	}
+
 	if now.Before(hour12) {
-		return hour12
+		return scheduledRun{time: hour12, runType: runDaily}
 	}
 	if now.Before(hour18) {
-		return hour18
+		return scheduledRun{time: hour18, runType: runDaily}
 	}
 
 	nextDay12 := hour12.AddDate(0, 0, 1)
-	return nextDay12
+	return scheduledRun{time: nextDay12, runType: runDaily}
 }
 
 func executeReport(jarvisAgent *agent.JarvisAgent, emailSvc *services.EmailService) {
@@ -137,4 +163,23 @@ func executeReport(jarvisAgent *agent.JarvisAgent, emailSvc *services.EmailServi
 	}
 
 	log.Println("✅ Relatório executado e enviado com sucesso!")
+}
+
+func executeMonthlyReport(jarvisAgent *agent.JarvisAgent, emailSvc *services.EmailService) {
+	log.Println("🚀 Executando relatório mensal...")
+
+	report, err := jarvisAgent.RunMonthly()
+	if err != nil {
+		log.Printf("❌ Erro ao gerar relatório mensal: %v", err)
+		return
+	}
+
+	log.Println("📧 Enviando email...")
+
+	if err := emailSvc.SendReport(report); err != nil {
+		log.Printf("❌ Erro ao enviar email: %v", err)
+		return
+	}
+
+	log.Println("✅ Relatório mensal executado e enviado com sucesso!")
 }

@@ -10,17 +10,19 @@ import (
 )
 
 type Config struct {
-	GoogleAPIKey     string
-	GeminiModel      string
-	TodayNotesPath   string
-	ReportOutputPath string
-	SMTPHost         string
-	SMTPPort         int
-	SMTPUser         string
-	SMTPPass         string
-	EmailFrom        string
-	EmailTo          string
-	EmailSubject     string
+	GoogleAPIKey      string
+	GeminiModel       string
+	TodayNotesPath    string
+	ReportOutputPath  string
+	MonthlyNotesPath  string
+	MonthlyReportPath string
+	SMTPHost          string
+	SMTPPort          int
+	SMTPUser          string
+	SMTPPass          string
+	EmailFrom         string
+	EmailTo           string
+	EmailSubject      string
 }
 
 func Load() (*Config, error) {
@@ -57,6 +59,18 @@ func Load() (*Config, error) {
 	}
 	reportPath = expandPath(reportPath, home)
 
+	monthlyNotesPath := os.Getenv("MONTHLY_NOTES_PATH")
+	if monthlyNotesPath == "" {
+		monthlyNotesPath = filepath.Join(home, "Documents/personal-notes/Trabalho/Gestão/Notes")
+	}
+	monthlyNotesPath = expandPath(monthlyNotesPath, home)
+
+	monthlyReportPath := os.Getenv("MONTHLY_REPORT_OUTPUT_PATH")
+	if monthlyReportPath == "" {
+		monthlyReportPath = filepath.Join(home, "Documents/personal-notes/Trabalho/Gestão/Notes/jarvis-report.md")
+	}
+	monthlyReportPath = expandPath(monthlyReportPath, home)
+
 	smtpHost := os.Getenv("SMTP_HOST")
 	if smtpHost == "" {
 		smtpHost = "smtp.gmail.com"
@@ -78,17 +92,19 @@ func Load() (*Config, error) {
 	}
 
 	return &Config{
-		GoogleAPIKey:     apiKey,
-		GeminiModel:      geminiModel,
-		TodayNotesPath:   notesPath,
-		ReportOutputPath: reportPath,
-		SMTPHost:         smtpHost,
-		SMTPPort:         smtpPort,
-		SMTPUser:         smtpUser,
-		SMTPPass:         smtpPass,
-		EmailFrom:        emailFrom,
-		EmailTo:          emailTo,
-		EmailSubject:     emailSubject,
+		GoogleAPIKey:      apiKey,
+		GeminiModel:       geminiModel,
+		TodayNotesPath:    notesPath,
+		ReportOutputPath:  reportPath,
+		MonthlyNotesPath:  monthlyNotesPath,
+		MonthlyReportPath: monthlyReportPath,
+		SMTPHost:          smtpHost,
+		SMTPPort:          smtpPort,
+		SMTPUser:          smtpUser,
+		SMTPPass:          smtpPass,
+		EmailFrom:         emailFrom,
+		EmailTo:           emailTo,
+		EmailSubject:      emailSubject,
 	}, nil
 }
 
@@ -101,4 +117,15 @@ func expandPath(path string, home string) string {
 		return filepath.Join(home, path)
 	}
 	return path
+}
+
+func (c *Config) GetMonthlyNotesPath(year, month string) string {
+	return filepath.Join(c.MonthlyNotesPath, year, month, "notes.md")
+}
+
+func (c *Config) GetMonthlyReportPath(year, month string) string {
+	dir := filepath.Dir(c.MonthlyReportPath)
+	ext := filepath.Ext(c.MonthlyReportPath)
+	base := strings.TrimSuffix(filepath.Base(c.MonthlyReportPath), ext)
+	return filepath.Join(dir, fmt.Sprintf("%s-%s-%s%s", base, year, month, ext))
 }

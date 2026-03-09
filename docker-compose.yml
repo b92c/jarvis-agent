@@ -6,7 +6,7 @@ services:
       - ${HOME}/Documents:/root/Documents
     env_file:
       - .env
-    restart: unless-stopped
+    restart: always
     logging:
       driver: "json-file"
       options:

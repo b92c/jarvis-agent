@@ -4,11 +4,14 @@ Assistente pessoal automatizado que analiza suas anotações diárias e gera rel
 
 ## Funcionalidades
 
-- **Execução automática**: Roda todos os dias às 12:00 e 18:00
-- **Leitura de anotações**: Lê o arquivo `today.md` do diretório de notas
-- **Análise com IA**: Usa Google Gemini (gemini-3-pro-preview) para analisar as anotações
-- **Geração de relatório**: Cria `jarvis-report.md` com:
-  - Principais pontos do dia
+- **Relatório Diário**: Roda todos os dias às 12:00 e 18:00
+- **Relatório Mensal**: Roda às 18:00 do último dia de cada mês
+- **Leitura de anotações**:
+  - Diário: arquivo `today.md` do diretório de notas
+  - Mensal: arquivo `notes.md` em `Notes/{ano}/{mes}/notes.md`
+- **Análise com IA**: Usa Google Gemini (gemini-2.5-flash) para analisar as anotações
+- **Geração de relatório**: Cria `jarvis-report.md` (diário) ou `jarvis-report-{ano}-{mes}.md` (mensal) com:
+  - Principais pontos do dia/mês
   - Pontos de atenção
   - Ações práticas sugeridas
   - Soluções para problemas
@@ -23,8 +26,12 @@ Assistente pessoal automatizado que analiza suas anotações diárias e gera rel
 GOOGLE_API_KEY=sua_chave_aqui
 
 # Paths (opcional - padrões já configurados)
-TODAY_NOTES_PATH=/root/Documents/personal-notes/Trabalho/Gestão/Notes/today.md
-REPORT_OUTPUT_PATH=/root/Documents/personal-notes/Trabalho/Gestão/Notes/jarvis-report.md
+TODAY_NOTES_PATH=~/Documents/personal-notes/Trabalho/Gestão/Notes/today.md
+REPORT_OUTPUT_PATH=~/Documents/personal-notes/Trabalho/Gestão/Notes/jarvis-report.md
+
+# Paths mensal (opcional)
+MONTHLY_NOTES_PATH=~/Documents/personal-notes/Trabalho/Gestão/Notes
+MONTHLY_REPORT_OUTPUT_PATH=~/Documents/personal-notes/Trabalho/Gestão/Notes/jarvis-report.md
 
 # Email (Gmail com App Password)
 SMTP_PASS=sua_app_password_aqui
@@ -44,7 +51,9 @@ SMTP_PASS=sua_app_password_aqui
 ## Executando
 
 ### Modo agendado (padrão)
-Executa automaticamente todos os dias às 12:00 e 18:00.
+Executa automaticamente:
+- Relatório diário: 12:00 e 18:00 todos os dias
+- Relatório mensal: 18:00 do último dia de cada mês
 
 ```bash
 go run .
@@ -64,6 +73,7 @@ go run . --once
 
 ```bash
 docker-compose run jarvis-once
+```
 
 ## Estrutura do Projeto
 
@@ -86,6 +96,8 @@ jarvis-agent/
 
 ## Formato do Relatório
 
+### Relatório Diário
+
 O agente gera um relatório em Markdown com o seguinte formato:
 
 ```markdown
@@ -106,6 +118,32 @@ O agente gera um relatório em Markdown com o seguinte formato:
 ## 📝 Observações Finais
 - ...
 ```
+
+### Relatório Mensal
+
+O relatório mensal é gerado no último dia de cada mês (às 18:00) e inclui:
+
+```markdown
+# 📊 Jarvis Report Mensal - [MÊS/ANO]
+
+## 🏆 Principais Conquistas do Mês
+- ...
+
+## ⚠️ Pontos de Atenção e Riscos
+- ...
+
+## 📚 Lições Aprendidas
+- ...
+
+## 🔜 Ações Pendentes e Próximos Passos
+- ...
+
+## 📝 Observações Finais
+- ...
+```
+
+O relatório mensal lê as notas de: `Notes/{ano}/{mes}/notes.md`
+Exemplo: `Notes/2026/03/notes.md`
 
 ## Licença
 

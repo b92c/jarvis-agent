@@ -35,3 +35,11 @@ func (r *FileReader) FileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
 }
+
+func (r *FileReader) ReadMonthlyNotes(path string) (string, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("erro ao ler arquivo %s: %w", path, err)
+	}
+	return string(content), nil
+}
