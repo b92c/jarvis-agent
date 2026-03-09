@@ -1,0 +1,14 @@
+services:
+  jarvis:
+    build: .
+    container_name: jarvis-agent
+    volumes:
+      - ${HOME}/Documents:/home/user/Documents
+    env_file:
+      - .env
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
