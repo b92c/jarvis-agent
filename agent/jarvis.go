@@ -17,17 +17,18 @@ import (
 )
 
 type JarvisAgent struct {
-	agentx  agent.Agent
-	cfg     *config.Config
-	runnerx *runner.Runner
-	reader  *tools.FileReader
-	writer  *tools.FileWriter
+	agentx         agent.Agent
+	cfg            *config.Config
+	runnerx        *runner.Runner
+	sessionService session.Service
+	reader         *tools.FileReader
+	writer         *tools.FileWriter
 }
 
 func NewJarvisAgent(cfg *config.Config, reader *tools.FileReader, writer *tools.FileWriter) (*JarvisAgent, error) {
 	ctx := context.Background()
 
-	model, err := gemini.NewModel(ctx, "gemini-3-pro-preview", &genai.ClientConfig{
+	model, err := gemini.NewModel(ctx, cfg.GeminiModel, &genai.ClientConfig{
 		APIKey: cfg.GoogleAPIKey,
 	})
 	if err != nil {
@@ -47,6 +48,7 @@ func NewJarvisAgent(cfg *config.Config, reader *tools.FileReader, writer *tools.
 	sessionService := session.InMemoryService()
 
 	runnerx, err := runner.New(runner.Config{
+		AppName:        "jarvis-agent",
 		Agent:          jarvisAgent,
 		SessionService: sessionService,
 	})
@@ -55,11 +57,12 @@ func NewJarvisAgent(cfg *config.Config, reader *tools.FileReader, writer *tools.
 	}
 
 	return &JarvisAgent{
-		agentx:  jarvisAgent,
-		cfg:     cfg,
-		runnerx: runnerx,
-		reader:  reader,
-		writer:  writer,
+		agentx:         jarvisAgent,
+		cfg:            cfg,
+		runnerx:        runnerx,
+		sessionService: sessionService,
+		reader:         reader,
+		writer:         writer,
 	}, nil
 }
 
@@ -129,8 +132,18 @@ Gere o relatório completo em português brasileiro seguindo o formato definido 
 
 	userMsg := genai.NewContentFromText(prompt, "user")
 
+	ctx := context.Background()
+	_, err = j.sessionService.Create(ctx, &session.CreateRequest{
+		AppName:   "jarvis-agent",
+		UserID:    "jarvis",
+		SessionID: "session-001",
+	})
+	if err != nil {
+		return "", fmt.Errorf("erro ao criar sessão: %w", err)
+	}
+
 	var report string
-	for event, err := range j.runnerx.Run(context.Background(), "jarvis", "session-001", userMsg, agent.RunConfig{}) {
+	for event, err := range j.runnerx.Run(ctx, "jarvis", "session-001", userMsg, agent.RunConfig{}) {
 		if err != nil {
 			return "", fmt.Errorf("erro ao executar agente: %w", err)
 		}

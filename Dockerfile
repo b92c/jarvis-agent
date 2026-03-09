@@ -22,4 +22,5 @@ COPY --from=builder /app/.env .
 
 ENV HOME=/root
 
-CMD ["./jarvis"]
+ENTRYPOINT ["./jarvis"]
+CMD []

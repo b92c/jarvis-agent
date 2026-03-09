@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 	"os"
 	"os/signal"
@@ -33,6 +34,9 @@ func loadSaoPauloLocation() *time.Location {
 }
 
 func main() {
+	runOnce := flag.Bool("once", false, "Executa o relatório uma vez e encerra")
+	flag.Parse()
+
 	log.Println("🤖 Jarvis Agent Starting...")
 
 	cfg, err := config.Load()
@@ -42,6 +46,7 @@ func main() {
 
 	log.Printf("📂 Notas: %s", cfg.TodayNotesPath)
 	log.Printf("📄 Report: %s", cfg.ReportOutputPath)
+	log.Printf("🧠 Modelo: %s", cfg.GeminiModel)
 
 	reader := tools.NewFileReader(cfg)
 	writer := tools.NewFileWriter(cfg)
@@ -50,6 +55,11 @@ func main() {
 	jarvisAgent, err := agent.NewJarvisAgent(cfg, reader, writer)
 	if err != nil {
 		log.Fatalf("Erro ao criar agente: %v", err)
+	}
+
+	if *runOnce {
+		executeReport(jarvisAgent, emailSvc)
+		return
 	}
 
 	log.Println("✅ Jarvis Agent inicializado com sucesso!")

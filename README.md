@@ -23,8 +23,8 @@ Assistente pessoal automatizado que analiza suas anotações diárias e gera rel
 GOOGLE_API_KEY=sua_chave_aqui
 
 # Paths (opcional - padrões já configurados)
-TODAY_NOTES_PATH=/home/user/Documents/personal-notes/Trabalho/Gestão/Notes/today.md
-REPORT_OUTPUT_PATH=/home/user/Documents/personal-notes/Trabalho/Gestão/Notes/jarvis-report.md
+TODAY_NOTES_PATH=/root/Documents/personal-notes/Trabalho/Gestão/Notes/today.md
+REPORT_OUTPUT_PATH=/root/Documents/personal-notes/Trabalho/Gestão/Notes/jarvis-report.md
 
 # Email (Gmail com App Password)
 SMTP_PASS=sua_app_password_aqui
@@ -43,7 +43,9 @@ SMTP_PASS=sua_app_password_aqui
 
 ## Executando
 
-### Localmente
+### Modo agendado (padrão)
+Executa automaticamente todos os dias às 12:00 e 18:00.
+
 ```bash
 go run .
 ```
@@ -52,6 +54,16 @@ go run .
 ```bash
 docker-compose up -d
 ```
+
+### Execução única (manual)
+Útil para caso de falha nas rotinas automatizadas (falha de hardware, conexão, etc).
+
+```bash
+go run . --once
+```
+
+```bash
+docker-compose run jarvis-once
 
 ## Estrutura do Projeto
 

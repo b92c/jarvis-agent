@@ -4,10 +4,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+
+	"github.com/joho/godotenv"
 )
 
 type Config struct {
 	GoogleAPIKey     string
+	GeminiModel      string
 	TodayNotesPath   string
 	ReportOutputPath string
 	SMTPHost         string
@@ -20,6 +24,9 @@ type Config struct {
 }
 
 func Load() (*Config, error) {
+	// Carrega variáveis do arquivo .env (ignora erro caso não exista)
+	_ = godotenv.Load()
+
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return nil, fmt.Errorf("erro ao obter home directory: %w", err)
@@ -33,15 +40,22 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("GOOGLE_API_KEY não configurada")
 	}
 
+	geminiModel := os.Getenv("GEMINI_MODEL")
+	if geminiModel == "" {
+		geminiModel = "gemini-2.5-flash"
+	}
+
 	notesPath := os.Getenv("TODAY_NOTES_PATH")
 	if notesPath == "" {
 		notesPath = defaultNotesPath
 	}
+	notesPath = expandPath(notesPath, home)
 
 	reportPath := os.Getenv("REPORT_OUTPUT_PATH")
 	if reportPath == "" {
 		reportPath = defaultReportPath
 	}
+	reportPath = expandPath(reportPath, home)
 
 	smtpHost := os.Getenv("SMTP_HOST")
 	if smtpHost == "" {
@@ -65,6 +79,7 @@ func Load() (*Config, error) {
 
 	return &Config{
 		GoogleAPIKey:     apiKey,
+		GeminiModel:      geminiModel,
 		TodayNotesPath:   notesPath,
 		ReportOutputPath: reportPath,
 		SMTPHost:         smtpHost,
@@ -75,4 +90,15 @@ func Load() (*Config, error) {
 		EmailTo:          emailTo,
 		EmailSubject:     emailSubject,
 	}, nil
+}
+
+// expandPath resolve caminhos com ~ e caminhos relativos
+func expandPath(path string, home string) string {
+	if strings.HasPrefix(path, "~/") {
+		return filepath.Join(home, path[2:])
+	}
+	if !filepath.IsAbs(path) {
+		return filepath.Join(home, path)
+	}
+	return path
 }

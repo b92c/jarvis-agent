@@ -3,7 +3,7 @@ services:
     build: .
     container_name: jarvis-agent
     volumes:
-      - ${HOME}/Documents:/home/user/Documents
+      - ${HOME}/Documents:/root/Documents
     env_file:
       - .env
     restart: unless-stopped
@@ -12,3 +12,12 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  jarvis-once:
+    build: .
+    container_name: jarvis-agent-once
+    volumes:
+      - ${HOME}/Documents:/root/Documents
+    env_file:
+      - .env
+    command: ["--once"]
