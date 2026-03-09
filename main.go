@@ -14,6 +14,16 @@ import (
 	"jarvis-agent/tools"
 )
 
+var saoPauloLocation *time.Location
+
+func init() {
+	var err error
+	saoPauloLocation, err = time.LoadLocation("America/Sao_Paulo")
+	if err != nil {
+		log.Fatalf("Erro ao carregar timezone America/Sao_Paulo: %v", err)
+	}
+}
+
 func main() {
 	log.Println("🤖 Jarvis Agent Starting...")
 
@@ -35,7 +45,7 @@ func main() {
 	}
 
 	log.Println("✅ Jarvis Agent inicializado com sucesso!")
-	log.Println("⏰ Scheduler ativo: executará às 11:50 e 18:00")
+	log.Println("⏰ Scheduler ativo: executará às 12:00 e 18:00")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -78,18 +88,18 @@ func runScheduler(ctx context.Context, jarvisAgent *agent.JarvisAgent, emailSvc 
 }
 
 func getNextRunTime(now time.Time) time.Time {
-	hour11 := time.Date(now.Year(), now.Month(), now.Day(), 11, 50, 0, 0, now.Location())
-	hour18 := time.Date(now.Year(), now.Month(), now.Day(), 18, 0, 0, 0, now.Location())
+	hour12 := time.Date(now.Year(), now.Month(), now.Day(), 12, 0, 0, 0, saoPauloLocation)
+	hour18 := time.Date(now.Year(), now.Month(), now.Day(), 18, 0, 0, 0, saoPauloLocation)
 
-	if now.Before(hour11) {
-		return hour11
+	if now.Before(hour12) {
+		return hour12
 	}
 	if now.Before(hour18) {
 		return hour18
 	}
 
-	nextDay11 := hour11.AddDate(0, 0, 1)
-	return nextDay11
+	nextDay12 := hour12.AddDate(0, 0, 1)
+	return nextDay12
 }
 
 func executeReport(jarvisAgent *agent.JarvisAgent, emailSvc *services.EmailService) {

@@ -4,7 +4,7 @@ Assistente pessoal automatizado que analiza suas anotações diárias e gera rel
 
 ## Funcionalidades
 
-- **Execução automática**: Roda todos os dias às 11:50 e 18:00
+- **Execução automática**: Roda todos os dias às 12:00 e 18:00
 - **Leitura de anotações**: Lê o arquivo `today.md` do diretório de notas
 - **Análise com IA**: Usa Google Gemini (gemini-3-pro-preview) para analisar as anotações
 - **Geração de relatório**: Cria `jarvis-report.md` com:
