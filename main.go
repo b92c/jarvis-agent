@@ -8,6 +8,8 @@ import (
 	"syscall"
 	"time"
 
+	_ "time/tzdata"
+
 	"jarvis-agent/agent"
 	"jarvis-agent/config"
 	"jarvis-agent/services"
@@ -17,11 +19,17 @@ import (
 var saoPauloLocation *time.Location
 
 func init() {
-	var err error
-	saoPauloLocation, err = time.LoadLocation("America/Sao_Paulo")
-	if err != nil {
-		log.Fatalf("Erro ao carregar timezone America/Sao_Paulo: %v", err)
+	saoPauloLocation = loadSaoPauloLocation()
+}
+
+func loadSaoPauloLocation() *time.Location {
+	loc, err := time.LoadLocation("America/Sao_Paulo")
+	if err == nil {
+		return loc
 	}
+
+	log.Printf("⚠️  Erro ao carregar timezone America/Sao_Paulo: %v. Usando offset fixo UTC-3.", err)
+	return time.FixedZone("America/Sao_Paulo", -3*60*60)
 }
 
 func main() {
