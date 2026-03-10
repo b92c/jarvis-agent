@@ -2,10 +2,13 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -63,7 +66,6 @@ func main() {
 	}
 
 	log.Println("✅ Jarvis Agent inicializado com sucesso!")
-	log.Println("⏰ Scheduler ativo: executará às 12:00 e 18:00 (diário) e às 18:00 (mensal - último dia do mês)")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -77,73 +79,125 @@ func main() {
 		cancel()
 	}()
 
-	runScheduler(ctx, jarvisAgent, emailSvc)
+	runSchedulerWithTicker(ctx, jarvisAgent, emailSvc, cfg.StateFilePath)
 }
 
-type runType int
-
-const (
-	runDaily runType = iota
-	runMonthly
-)
-
-type scheduledRun struct {
-	time    time.Time
-	runType runType
+type SchedulerState struct {
+	LastExecutionDate string `json:"last_execution_date"`
+	Executed12h       bool   `json:"executed_12h"`
+	Executed18h       bool   `json:"executed_18h"`
+	LastMonthExecuted string `json:"last_month_executed"`
 }
 
-func runScheduler(ctx context.Context, jarvisAgent *agent.JarvisAgent, emailSvc *services.EmailService) {
+func loadState(stateFilePath string) (*SchedulerState, error) {
+	data, err := os.ReadFile(stateFilePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return &SchedulerState{}, nil
+		}
+		return nil, fmt.Errorf("erro ao ler arquivo de estado: %w", err)
+	}
+
+	var state SchedulerState
+	if err := json.Unmarshal(data, &state); err != nil {
+		return nil, fmt.Errorf("erro ao parsear arquivo de estado: %w", err)
+	}
+
+	return &state, nil
+}
+
+func saveState(stateFilePath string, state *SchedulerState) error {
+	data, err := json.MarshalIndent(state, "", "  ")
+	if err != nil {
+		return fmt.Errorf("erro ao serializar estado: %w", err)
+	}
+
+	dir := stateFilePath[:len(stateFilePath)-len(filepath.Base(stateFilePath))]
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("erro ao criar diretório de estado: %w", err)
+	}
+
+	if err := os.WriteFile(stateFilePath, data, 0644); err != nil {
+		return fmt.Errorf("erro ao salvar arquivo de estado: %w", err)
+	}
+
+	return nil
+}
+
+func runSchedulerWithTicker(ctx context.Context, jarvisAgent *agent.JarvisAgent, emailSvc *services.EmailService, stateFilePath string) {
+	ticker := time.NewTicker(10 * time.Minute)
+	defer ticker.Stop()
+
+	log.Println("⏰ Scheduler ativo: executará às 12:00 e 18:00 (diário) e dia 28 às 18:00 (mensal)")
+	log.Println("⏰ Verificação a cada 10 minutos")
+
 	for {
 		select {
 		case <-ctx.Done():
 			log.Println("Scheduler encerrado")
 			return
-		default:
+		case <-ticker.C:
 			now := time.Now()
+			inSaoPaulo := now.In(saoPauloLocation)
+			today := inSaoPaulo.Format("2006-01-02")
+			currentMonth := inSaoPaulo.Format("2006-01")
 
-			nextRun := getNextRunTime(now)
-			waitDuration := nextRun.time.Sub(now)
-
-			runTypeStr := "diário"
-			if nextRun.runType == runMonthly {
-				runTypeStr = "mensal"
+			state, err := loadState(stateFilePath)
+			if err != nil {
+				log.Printf("⚠️ Erro ao carregar estado: %v", err)
+				continue
 			}
-			log.Printf("⏳ Próxima execução: %s (%s)", nextRun.time.Format("02/01/2006 15:04:05"), runTypeStr)
-			log.Printf("⏳ Aguardando %v...", waitDuration)
 
-			select {
-			case <-ctx.Done():
-				return
-			case <-time.After(waitDuration):
-				if nextRun.runType == runMonthly {
-					executeMonthlyReport(jarvisAgent, emailSvc)
-				} else {
-					executeReport(jarvisAgent, emailSvc)
+			if state.LastExecutionDate != today {
+				state.Executed12h = false
+				state.Executed18h = false
+			}
+
+			if state.LastMonthExecuted != currentMonth {
+				state.LastMonthExecuted = ""
+			}
+
+			hour := inSaoPaulo.Hour()
+			minute := inSaoPaulo.Minute()
+			day := inSaoPaulo.Day()
+
+			if hour == 12 && minute < 10 && !state.Executed12h {
+				log.Println("🕐 Executando relatório das 12:00...")
+				executeReport(jarvisAgent, emailSvc)
+				state.Executed12h = true
+				state.LastExecutionDate = today
+				if err := saveState(stateFilePath, state); err != nil {
+					log.Printf("⚠️ Erro ao salvar estado: %v", err)
 				}
+				continue
+			}
+
+			if hour == 18 && minute < 10 && !state.Executed18h {
+				log.Println("🕕 Executando relatório das 18:00...")
+				executeReport(jarvisAgent, emailSvc)
+				state.Executed18h = true
+				state.LastExecutionDate = today
+				if err := saveState(stateFilePath, state); err != nil {
+					log.Printf("⚠️ Erro ao salvar estado: %v", err)
+				}
+				continue
+			}
+
+			if day == 28 && hour == 18 && minute < 10 && state.LastMonthExecuted != currentMonth {
+				log.Println("🗓️ Executando relatório mensal (dia 28)...")
+				executeMonthlyReport(jarvisAgent, emailSvc)
+				state.LastMonthExecuted = currentMonth
+				if err := saveState(stateFilePath, state); err != nil {
+					log.Printf("⚠️ Erro ao salvar estado: %v", err)
+				}
+				continue
+			}
+
+			if err := saveState(stateFilePath, state); err != nil {
+				log.Printf("⚠️ Erro ao salvar estado: %v", err)
 			}
 		}
 	}
-}
-
-func getNextRunTime(now time.Time) scheduledRun {
-	hour12 := time.Date(now.Year(), now.Month(), now.Day(), 12, 0, 0, 0, saoPauloLocation)
-	hour18 := time.Date(now.Year(), now.Month(), now.Day(), 18, 0, 0, 0, saoPauloLocation)
-
-	lastDayOfMonth := time.Date(now.Year(), now.Month()+1, 0, 18, 0, 0, 0, saoPauloLocation)
-
-	if now.Day() == lastDayOfMonth.Day() && now.After(hour12) {
-		return scheduledRun{time: lastDayOfMonth, runType: runMonthly}
-	}
-
-	if now.Before(hour12) {
-		return scheduledRun{time: hour12, runType: runDaily}
-	}
-	if now.Before(hour18) {
-		return scheduledRun{time: hour18, runType: runDaily}
-	}
-
-	nextDay12 := hour12.AddDate(0, 0, 1)
-	return scheduledRun{time: nextDay12, runType: runDaily}
 }
 
 func executeReport(jarvisAgent *agent.JarvisAgent, emailSvc *services.EmailService) {

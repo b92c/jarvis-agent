@@ -23,10 +23,10 @@ type Config struct {
 	EmailFrom         string
 	EmailTo           string
 	EmailSubject      string
+	StateFilePath     string
 }
 
 func Load() (*Config, error) {
-	// Carrega variáveis do arquivo .env (ignora erro caso não exista)
 	_ = godotenv.Load()
 
 	home, err := os.UserHomeDir()
@@ -91,6 +91,11 @@ func Load() (*Config, error) {
 		emailSubject = "[JARVIS] Seu report está pronto senhor"
 	}
 
+	stateFilePath := os.Getenv("STATE_FILE_PATH")
+	if stateFilePath == "" {
+		stateFilePath = filepath.Join(home, ".jarvis-agent", "memory-ticker.json")
+	}
+
 	return &Config{
 		GoogleAPIKey:      apiKey,
 		GeminiModel:       geminiModel,
@@ -105,6 +110,7 @@ func Load() (*Config, error) {
 		EmailFrom:         emailFrom,
 		EmailTo:           emailTo,
 		EmailSubject:      emailSubject,
+		StateFilePath:     stateFilePath,
 	}, nil
 }
 
